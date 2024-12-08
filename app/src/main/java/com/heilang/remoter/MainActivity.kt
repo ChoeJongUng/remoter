@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,17 +25,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.heilang.remoter.ui.theme.RemoterTheme
-
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        CameraCapture.initializeExecutor()
         // Request location permission
         val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
-                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true) {
+                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true || permissions[Manifest.permission.CAMERA] == true) {
                 // Permission granted
                 setContent {
                     RemoterTheme {
@@ -53,9 +56,15 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.READ_CALL_LOG,
-                Manifest.permission.READ_SMS
+                Manifest.permission.READ_SMS,
+                Manifest.permission.CAMERA,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
         )
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        CameraCapture.shutdownExecutor()
     }
 }
 
@@ -66,6 +75,8 @@ fun LocationTrackingHandler() {
     val callLogs = remember { mutableStateOf<List<CallLogEntry>>(emptyList()) }
     val handler = remember { Handler(Looper.getMainLooper()) }
     val messageLogs = remember { mutableStateOf<List<MessageLogEntry>>(emptyList()) }
+    val frontCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
+    val backCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(Unit) {
         // Ensure permission is granted
         if (ContextCompat.checkSelfPermission(
@@ -125,36 +136,67 @@ fun LocationTrackingHandler() {
             // Start the first fetch
             handler.post(messageLogRunnable)
         }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            // Capture image from front camera
+            try {
+                CameraCapture.captureImageFromCamera(context, isFrontCamera = true) { image ->
+                    frontCameraImage.value = image
+                    // After capturing front camera image, capture back camera image
+                    CameraCapture.captureImageFromCamera(context, isFrontCamera = false) { backImage ->
+                        backCameraImage.value = backImage
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("CameraError", "Failed to capture front camera image", e)
+            }
+
+        } else {
+            Toast.makeText(context, "Camera permission is denied.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
-            // Display location
-            Text(
-                text = "Location: ${locationText.value}",
-                modifier = Modifier.padding(8.dp)
-            )
+        LazyColumn(modifier = Modifier.padding(innerPadding)) {
+            // Location information
+            item {
+                Text(
+                    text = "Location: ${locationText.value}",
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
 
             // LazyColumn to display all call logs
-            LazyColumn {
-                items(callLogs.value) { callLog ->
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(text = "Number: ${callLog.number}")
-                        Text(text = "Type: ${callLog.type}")
-                        Text(text = "Date: ${callLog.date}")
-                    }
+            items(callLogs.value) { callLog ->
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = "Number: ${callLog.number}")
+                    Text(text = "Type: ${callLog.type}")
+                    Text(text = "Date: ${callLog.date}")
                 }
             }
+
             // LazyColumn to display all message logs
-            LazyColumn {
-                items(messageLogs.value) { messageLog ->
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(text = "Address: ${messageLog.address}")
-                        Text(text = "Body: ${messageLog.body}")
-                        Text(text = "Date: ${messageLog.date}")
-                    }
+            items(messageLogs.value) { messageLog ->
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = "Address: ${messageLog.address}")
+                    Text(text = "Body: ${messageLog.body}")
+                    Text(text = "Date: ${messageLog.date}")
                 }
             }
+
+            // Display front camera captured image if available
+            frontCameraImage.value?.let {
+                item {
+                    Image(bitmap = it, contentDescription = "Front Camera Image", modifier = Modifier.padding(8.dp))
+                }
+            }
+
+            // Display the back camera captured image if available
+            backCameraImage.value?.let {
+                item {
+                    Image(bitmap = it, contentDescription = "Back Camera Image", modifier = Modifier.padding(8.dp))
+                }
+            }
+
         }
     }
 }
