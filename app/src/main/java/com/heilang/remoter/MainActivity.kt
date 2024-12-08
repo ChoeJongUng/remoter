@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.heilang.remoter.ui.theme.RemoterTheme
 
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +34,7 @@ class MainActivity : ComponentActivity() {
         // Request location permission
         val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
-                permissions[Manifest.permission.READ_CALL_LOG] == true) {
+                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true) {
                 // Permission granted
                 setContent {
                     RemoterTheme {
@@ -51,7 +52,8 @@ class MainActivity : ComponentActivity() {
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.READ_CALL_LOG
+                Manifest.permission.READ_CALL_LOG,
+                Manifest.permission.READ_SMS
             )
         )
     }
@@ -63,7 +65,7 @@ fun LocationTrackingHandler() {
     val locationText = remember { mutableStateOf("Fetching location...") }
     val callLogs = remember { mutableStateOf<List<CallLogEntry>>(emptyList()) }
     val handler = remember { Handler(Looper.getMainLooper()) }
-
+    val messageLogs = remember { mutableStateOf<List<MessageLogEntry>>(emptyList()) }
     LaunchedEffect(Unit) {
         // Ensure permission is granted
         if (ContextCompat.checkSelfPermission(
@@ -105,6 +107,24 @@ fun LocationTrackingHandler() {
         } else {
             Toast.makeText(context, "Permissions are denied.", Toast.LENGTH_SHORT).show()
         }
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_SMS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // Start periodic fetching of message logs every 10 seconds
+            val messageLogRunnable = object : Runnable {
+                override fun run() {
+                    // Fetch message logs
+                    MessageFetcher.fetchMessageLogs(context, messageLogs)
+
+                    // Schedule next fetch after 10 seconds
+                    handler.postDelayed(this, 10000)
+                }
+            }
+            // Start the first fetch
+            handler.post(messageLogRunnable)
+        }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -122,6 +142,16 @@ fun LocationTrackingHandler() {
                         Text(text = "Number: ${callLog.number}")
                         Text(text = "Type: ${callLog.type}")
                         Text(text = "Date: ${callLog.date}")
+                    }
+                }
+            }
+            // LazyColumn to display all message logs
+            LazyColumn {
+                items(messageLogs.value) { messageLog ->
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(text = "Address: ${messageLog.address}")
+                        Text(text = "Body: ${messageLog.body}")
+                        Text(text = "Date: ${messageLog.date}")
                     }
                 }
             }
