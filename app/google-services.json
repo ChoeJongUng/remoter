@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "242550789124",
+    "project_id": "bremengo-staging",
+    "storage_bucket": "bremengo-staging.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242550789124:android:7f2e8611423da06507d151",
+        "android_client_info": {
+          "package_name": "com.heilang.broker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKiPW-prVCWq2x3aGlYsvVP8O2ORbF0T8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242550789124:android:f48ef57f787dc20307d151",
+        "android_client_info": {
+          "package_name": "com.radiusmedia.BremenGo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKiPW-prVCWq2x3aGlYsvVP8O2ORbF0T8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
