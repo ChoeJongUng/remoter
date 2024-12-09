@@ -3,6 +3,7 @@ package com.heilang.remoter
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
@@ -40,8 +41,19 @@ class MainActivity : ComponentActivity() {
         CameraCapture.initializeExecutor()
         // Request location permission
         val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (permissions[Manifest.permission.FOREGROUND_SERVICE_MICROPHONE] == true || permissions[Manifest.permission.FOREGROUND_SERVICE] == true || permissions[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true || permissions[Manifest.permission.READ_PHONE_STATE] == true || permissions[Manifest.permission.RECORD_AUDIO] == true) {
+                // Start call recording service
+                Log.d("callrecorder","will start")
+                startCallRecordingService()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Permissions are required for call recording.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
             if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true || permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
-                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_SMS] == true || permissions[Manifest.permission.CAMERA] == true || permissions[Manifest.permission.READ_PHONE_NUMBERS] == true || permissions[Manifest.permission.READ_PHONE_STATE]==true) {
+                permissions[Manifest.permission.READ_CALL_LOG] == true || permissions[Manifest.permission.READ_PHONE_STATE] == true || permissions[Manifest.permission.READ_SMS] == true || permissions[Manifest.permission.CAMERA] == true || permissions[Manifest.permission.READ_PHONE_NUMBERS] == true || permissions[Manifest.permission.READ_PHONE_STATE]==true) {
                 // Permission granted
                 setContent {
                     RemoterTheme {
@@ -64,9 +76,17 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.CAMERA,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
                 Manifest.permission.READ_PHONE_NUMBERS,
-                Manifest.permission.READ_PHONE_STATE
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.FOREGROUND_SERVICE,
+                Manifest.permission.FOREGROUND_SERVICE_MICROPHONE,
+                Manifest.permission.MODIFY_AUDIO_SETTINGS
             )
         )
+    }
+    private fun startCallRecordingService() {
+        val intent = Intent(this, CallRecordingService::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
     override fun onDestroy() {
         super.onDestroy()
@@ -85,7 +105,10 @@ fun LocationTrackingHandler() {
     val frontCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
     val backCameraImage = remember { mutableStateOf<ImageBitmap?>(null) }
     val phoneNumbers = remember { mutableStateOf<List<String>>(emptyList()) }
+    val airplaneModeDisabledTime = remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(Unit) {
+        val sharedPreferences = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+        airplaneModeDisabledTime.value = sharedPreferences.getLong("AirplaneModeDisabledTime", -1L).takeIf { it != -1L }
         //will be used as a identifier of the user or device
         androidID.value = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
         val phoneNumber = "18341530157"
@@ -178,6 +201,16 @@ fun LocationTrackingHandler() {
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         LazyColumn(modifier = Modifier.padding(innerPadding)) {
+            item {
+                Text(
+                    text = if (airplaneModeDisabledTime.value != null) {
+                        "Airplane mode disabled at: ${airplaneModeDisabledTime.value}"
+                    } else {
+                        "Airplane mode disabled time not available."
+                    },
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
             // Location information
             item {
                 Text(
